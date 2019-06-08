@@ -141,12 +141,15 @@ static args_option_t *_get_option(args_option_t *options, const char *opt)
 {
     for (int i = 0; options[i].opt_type != OPTTYPE_NONE; i++)
     {
-        if (0 == strncmp(options[i].short_flag, opt, MAX_OPTION_LEN))
+        const char *shortf = options[i].short_flag;
+        const char *longf = options[i].long_flag;
+
+        if (shortf && (0 == strncmp(shortf, opt, MAX_OPTION_LEN)))
         {
             return &options[i];
         }
 
-        if (0 == strncmp(options[i].long_flag, opt, MAX_OPTION_LEN))
+        if (longf && (0 == strncmp(options[i].long_flag, opt, MAX_OPTION_LEN)))
         {
             return &options[i];
         }
