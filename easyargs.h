@@ -11,6 +11,16 @@
     .arg_type = argtype, \
     .opt_type = OPTTYPE_OPTION, \
     .data = argdata, \
+    .seen = 0 \
+}
+
+#define ARGS_POSITIONAL_ARG(argtype, argdata) { \
+    .short_flag = NULL, \
+    .long_flag = NULL, \
+    .arg_type = argtype, \
+    .opt_type = OPTTYPE_POSITIONAL, \
+    .data = argdata, \
+    .seen = 0 \
 }
 
 #define ARGS_FLAG(short_flagstr, long_flagstr, value) { \
@@ -19,6 +29,7 @@
     .arg_type = ARGTYPE_NONE, \
     .opt_type = OPTTYPE_FLAG, \
     .data = value, \
+    .seen = 0 \
 }
 
 #define ARGS_END_OF_OPTIONS { \
@@ -27,6 +38,7 @@
     .arg_type = ARGTYPE_NONE, \
     .opt_type = OPTTYPE_NONE, \
     .data = NULL, \
+    .seen = 0 \
 }
 
 
@@ -63,10 +75,12 @@ static decode_params_t _decoders[] = {
 typedef enum {
     OPTTYPE_FLAG,
     OPTTYPE_OPTION,
+    OPTTYPE_POSITIONAL,
     OPTTYPE_NONE
 } opttype_e;
 
 typedef struct {
+    int seen;
     const char *short_flag;
     const char *long_flag;
     argtype_e arg_type;
@@ -185,9 +199,23 @@ static int is_optarg(char *argv[], int index, args_option_t *options)
 }
 
 
+static int _more_optargs_ahead(int argc, char *argv[], int index)
+{
+    for (int i = index; i < argc; i++)
+    {
+        if (argv[i][0] == '-')
+        {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 /*
  * Find any arguments that do not follow an option flag requiring an argument,
- * and shift them to the end of the argument list
+ * and shift them to the end of the argument list. Returns the index of the
+ * first positional arg after shifting is done.
  */
 static void shift_nonopt_args(int argc, char *argv[], args_option_t *options)
 {
@@ -195,6 +223,11 @@ static void shift_nonopt_args(int argc, char *argv[], args_option_t *options)
         if (argv[i][0] != '-') {
             if (is_optarg(argv, i, options)) {
                 continue;
+            }
+
+            if (!_more_optargs_ahead(argc, argv, i + 1))
+            {
+                return;
             }
 
             char *temp = argv[i];
@@ -208,6 +241,9 @@ static void shift_nonopt_args(int argc, char *argv[], args_option_t *options)
     }
 }
 
+/*
+ * Set all flag data to zero
+ */
 static void init_options(args_option_t *options)
 {
     for (int i = 0; options[i].opt_type != OPTTYPE_NONE; i++)
@@ -221,21 +257,58 @@ static void init_options(args_option_t *options)
     }
 }
 
-int parse_arguments(int argc, char *argv[], args_option_t *options)
+/*
+ * Decode the argument data for a named option
+ */
+int _decode_value(args_option_t *opt, char *flag, char *input)
 {
-    if ((NULL == argv) || (NULL == options))
+    decode_params_t *params = &_decoders[opt->arg_type];
+    if (params->decode(input, opt->data) < 0)
     {
+        printf("%s value required for %s\n", params->name, flag);
         return -1;
     }
 
-    if (1 >= argc)
+    return 0;
+}
+
+/*
+ * Parse a single positional arg
+ */
+int parse_positional(char *arg, args_option_t *options)
+{
+
+    // Find the first unseen positional arg entry
+    args_option_t *opt = NULL;
+    for (int i = 0; options[i].opt_type != OPTTYPE_NONE; i++)
+    {
+        if ((options[i].opt_type == OPTTYPE_POSITIONAL) && !options[i].seen)
+        {
+            opt = &options[i];
+            break;
+        }
+    }
+
+    // If no unseen positional args, we're done here
+    if (NULL == opt)
     {
         return 0;
     }
 
-    init_options(options);
-    shift_nonopt_args(argc, argv, options);
+    if (_decode_value(opt, "positional argument", arg) < 0)
+    {
+        return -1;
+    }
 
+    opt->seen = 1;
+    return 0;
+}
+
+/*
+ * Parse all named options and flags
+ */
+int parse_options(int argc, char *argv[], args_option_t *options)
+{
     for (int i = 1; i < argc; i++)
     {
         if ((argv[i][0] == '-') && argv[i][1])
@@ -247,6 +320,14 @@ int parse_arguments(int argc, char *argv[], args_option_t *options)
                 printf("unknown option '%s'\n", argv[i]);
                 return -1;
             }
+
+            if (opt->seen)
+            {
+                printf("option '%s' is set more than once\n", argv[i]);
+                return -1;
+            }
+
+            opt->seen = 1;
 
             // If this is a flag, just set it and we're done
             if (opt->opt_type == OPTTYPE_FLAG)
@@ -274,14 +355,44 @@ int parse_arguments(int argc, char *argv[], args_option_t *options)
                 return -1;
             }
 
-            decode_params_t *params = &_decoders[opt->arg_type];
-            if (params->decode(argv[i + 1], opt->data) < 0)
+            if (_decode_value(opt, argv[i], argv[i + 1]) < 0)
             {
-                printf("%s value required for option '%s'\n",
-                       params->name, argv[i]);
+                return -1;
+            }
+
+            i += 1;
+        }
+
+        else
+        {
+            if (parse_positional(argv[i], options) < 0)
+            {
                 return -1;
             }
         }
+    }
+
+    return 0;
+}
+
+int parse_arguments(int argc, char *argv[], args_option_t *options)
+{
+    if ((NULL == argv) || (NULL == options))
+    {
+        return -1;
+    }
+
+    if (1 >= argc)
+    {
+        return 0;
+    }
+
+    init_options(options);
+    shift_nonopt_args(argc, argv, options);
+
+
+    if (parse_options(argc, argv, options) < 0) {
+        return -1;
     }
 
     return 0;
