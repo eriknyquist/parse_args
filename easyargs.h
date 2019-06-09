@@ -47,7 +47,9 @@ typedef int (*arg_decoder_t)(char*, void*);
 static int _decode_int(char *input, void *output);
 static int _decode_long(char *input, void *output);
 static int _decode_uint(char *input, void *output);
+static int _decode_ulong(char *input, void *output);
 static int _decode_float(char *input, void *output);
+static int _decode_double(char *input, void *output);
 static int _decode_string(char *input, void *output);
 static int _decode_hex(char *input, void *output);
 
@@ -60,19 +62,23 @@ typedef enum {
     ARGTYPE_INT = 0,
     ARGTYPE_LONG,
     ARGTYPE_UINT,
+    ARGTYPE_ULONG,
     ARGTYPE_FLOAT,
+    ARGTYPE_DOUBLE,
     ARGTYPE_STRING,
     ARGTYPE_HEX,
     ARGTYPE_NONE
 } argtype_e;
 
 static decode_params_t _decoders[] = {
-    { .decode = _decode_int, .name = "integer" },            // ARGTYPE_INT
-    { .decode = _decode_long, .name = "long integer" },      // ARGTYPE_LONG
-    { .decode = _decode_uint, .name = "unsigned integer" },  // ARGTYPE_UINT
-    { .decode = _decode_float, .name = "floating point" },   // ARGTYPE_FLOAT
-    { .decode = _decode_string, .name = "string" },          // ARGTYPE_STRING
-    { .decode = _decode_hex, .name = "hexadecimal" }         // ARGTYPE_HEX
+    { .decode=_decode_int, .name="integer" },                 // ARGTYPE_INT
+    { .decode=_decode_long, .name="long integer" },           // ARGTYPE_LONG
+    { .decode=_decode_uint, .name="unsigned integer" },       // ARGTYPE_UINT
+    { .decode=_decode_ulong, .name="unsigned long integer" }, // ARGTYPE_ULONG
+    { .decode=_decode_float, .name="floating point" },        // ARGTYPE_FLOAT
+    { .decode=_decode_double, .name="floating point" },       // ARGTYPE_DOUBLE
+    { .decode=_decode_string, .name="string" },               // ARGTYPE_STRING
+    { .decode=_decode_hex, .name="hexadecimal" }              // ARGTYPE_HEX
 };
 
 typedef enum {
@@ -133,17 +139,45 @@ static int _decode_uint(char *input, void *output)
     return 0;
 }
 
+static int _decode_ulong(char *input, void *output)
+{
+    char *endptr = NULL;
+    unsigned long longval = strtoul(input, &endptr, 10);
+    if (!endptr || *endptr)
+    {
+        return -1;
+    }
+
+    unsigned long *long_output = (unsigned long *)output;
+    *long_output = longval;
+    return 0;
+}
+
 static int _decode_float(char *input, void *output)
 {
     char *endptr = NULL;
-    float floatval = strtod(input, &endptr);
+    double val = strtod(input, &endptr);
     if (!endptr || *endptr)
     {
         return -1;
     }
 
     float *float_output = (float *)output;
-    *float_output = (float)floatval;
+    *float_output = (float)val;
+    return 0;
+}
+
+static int _decode_double(char *input, void *output)
+{
+    char *endptr = NULL;
+    double val = strtod(input, &endptr);
+    if (!endptr || *endptr)
+    {
+        return -1;
+    }
+
+    double *double_output = (double *)output;
+    *double_output = val;
     return 0;
 }
 
