@@ -472,9 +472,20 @@ int parse_arguments(int argc, char *argv[], args_option_t *options)
     _init_options(options);
     _shift_nonopt_args(argc, argv, options);
 
-
     if (_parse_options(argc, argv, options) < 0) {
         return -1;
+    }
+
+    for (int i = 0; options[i].opt_type != OPTTYPE_NONE; i++)
+    {
+        if (OPTTYPE_POSITIONAL == options[i].opt_type)
+        {
+            if (!options[i].seen)
+            {
+                printf("missing required positional arguments\n");
+                return -1;
+            }
+        }
     }
 
     return 0;
