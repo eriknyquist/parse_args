@@ -191,14 +191,14 @@ static int _decode_string(char *input, void *output)
 static int _decode_hex(char *input, void *output)
 {
     char *endptr = NULL;
-    long intval = strtol(input, &endptr, 16);
+    long val = strtol(input, &endptr, 16);
     if (!endptr || *endptr)
     {
         return -1;
     }
 
-    int *int_output = (int *)output;
-    *int_output = (int)intval;
+    long *long_output = (long *)output;
+    *long_output = val;
     return 0;
 }
 

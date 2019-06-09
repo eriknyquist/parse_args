@@ -7,7 +7,7 @@ int intval = 0;
 long longval = 0;
 float floatval = 0.0;
 char *strval = NULL;
-int hexval = 0;
+long hexval = 0;
 unsigned uintval = 0;
 
 int qflag = 10;
@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
     }
 
     printf("q=%d, w=%d\n", qflag, wflag);
-    printf("i=%d, l=%ld, f=%.2f, u=%u, x=%d, s=%s\n", intval, longval, floatval, uintval, hexval, strval);
+    printf("i=%d, l=%ld, f=%.2f, u=%u, x=%ld, s=%s\n", intval, longval, floatval, uintval, hexval, strval);
     printf("1=%.2f, 2=%.2f\n", p1, p2);
     return 0;
 }
