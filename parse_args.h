@@ -563,11 +563,6 @@ int parse_arguments(int argc, char *argv[], args_option_t *options)
         return -1;
     }
 
-    if (1 >= argc)
-    {
-        return 0;
-    }
-
     _init_options(options);
     _shift_nonopt_args(argc, argv, options);
 
