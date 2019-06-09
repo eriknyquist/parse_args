@@ -45,6 +45,7 @@
 typedef int (*arg_decoder_t)(char*, void*);
 
 static int _decode_int(char *input, void *output);
+static int _decode_long(char *input, void *output);
 static int _decode_uint(char *input, void *output);
 static int _decode_float(char *input, void *output);
 static int _decode_string(char *input, void *output);
@@ -57,6 +58,7 @@ typedef struct {
 
 typedef enum {
     ARGTYPE_INT = 0,
+    ARGTYPE_LONG,
     ARGTYPE_UINT,
     ARGTYPE_FLOAT,
     ARGTYPE_STRING,
@@ -66,6 +68,7 @@ typedef enum {
 
 static decode_params_t _decoders[] = {
     { .decode = _decode_int, .name = "integer" },            // ARGTYPE_INT
+    { .decode = _decode_long, .name = "long integer" },      // ARGTYPE_LONG
     { .decode = _decode_uint, .name = "unsigned integer" },  // ARGTYPE_UINT
     { .decode = _decode_float, .name = "floating point" },   // ARGTYPE_FLOAT
     { .decode = _decode_string, .name = "string" },          // ARGTYPE_STRING
@@ -99,6 +102,20 @@ static int _decode_int(char *input, void *output)
 
     int *int_output = (int *)output;
     *int_output = (int)intval;
+    return 0;
+}
+
+static int _decode_long(char *input, void *output)
+{
+    char *endptr = NULL;
+    long longval = strtol(input, &endptr, 10);
+    if (!endptr || *endptr)
+    {
+        return -1;
+    }
+
+    long *long_output = (long *)output;
+    *long_output = longval;
     return 0;
 }
 
@@ -199,7 +216,7 @@ static int is_optarg(char *argv[], int index, args_option_t *options)
 }
 
 
-static int _more_optargs_ahead(int argc, char *argv[], int index)
+static int _optargs_ahead(int argc, char *argv[], int index)
 {
     for (int i = index; i < argc; i++)
     {
@@ -217,15 +234,17 @@ static int _more_optargs_ahead(int argc, char *argv[], int index)
  * and shift them to the end of the argument list. Returns the index of the
  * first positional arg after shifting is done.
  */
-static void shift_nonopt_args(int argc, char *argv[], args_option_t *options)
+static void _shift_nonopt_args(int argc, char *argv[], args_option_t *options)
 {
-    for (int i = 1; i < (argc - 1); i++) {
+    int moved = 0;
+
+    for (int i = 1; i < (argc - moved); i++) {
         if (argv[i][0] != '-') {
             if (is_optarg(argv, i, options)) {
                 continue;
             }
 
-            if (!_more_optargs_ahead(argc, argv, i + 1))
+            if (!_optargs_ahead(argc, argv, i + 1) && (0 == moved))
             {
                 return;
             }
@@ -236,6 +255,7 @@ static void shift_nonopt_args(int argc, char *argv[], args_option_t *options)
                 argv[j - 1] = argv[j];
             }
 
+            moved += 1;
             argv[argc - 1] = temp;
         }
     }
@@ -244,7 +264,7 @@ static void shift_nonopt_args(int argc, char *argv[], args_option_t *options)
 /*
  * Set all flag data to zero
  */
-static void init_options(args_option_t *options)
+static void _init_options(args_option_t *options)
 {
     for (int i = 0; options[i].opt_type != OPTTYPE_NONE; i++)
     {
@@ -275,7 +295,7 @@ int _decode_value(args_option_t *opt, char *flag, char *input)
 /*
  * Parse a single positional arg
  */
-int parse_positional(char *arg, args_option_t *options)
+int _parse_positional(char *arg, args_option_t *options)
 {
 
     // Find the first unseen positional arg entry
@@ -295,20 +315,40 @@ int parse_positional(char *arg, args_option_t *options)
         return 0;
     }
 
+    opt->seen = 1;
     if (_decode_value(opt, "positional argument", arg) < 0)
     {
         return -1;
     }
 
-    opt->seen = 1;
     return 0;
+}
+
+/*
+ * Calculate max. number of positional arguments allowed
+ */
+int _calculate_max_positionals(args_option_t *options)
+{
+    int ret = 0;
+    for (int i = 0; options[i].opt_type != OPTTYPE_NONE; i++)
+    {
+        if (OPTTYPE_POSITIONAL == options[i].opt_type)
+        {
+            ret += 1;
+        }
+    }
+
+    return ret;
 }
 
 /*
  * Parse all named options and flags
  */
-int parse_options(int argc, char *argv[], args_option_t *options)
+int _parse_options(int argc, char *argv[], args_option_t *options)
 {
+    int max_positionals = _calculate_max_positionals(options);
+    int positionals = 0;
+
     for (int i = 1; i < argc; i++)
     {
         if ((argv[i][0] == '-') && argv[i][1])
@@ -365,10 +405,18 @@ int parse_options(int argc, char *argv[], args_option_t *options)
 
         else
         {
-            if (parse_positional(argv[i], options) < 0)
+            if (positionals >= max_positionals)
+            {
+                printf("too many positional arguments\n");
+                return -1;
+            }
+
+            if (_parse_positional(argv[i], options) < 0)
             {
                 return -1;
             }
+
+            positionals += 1;
         }
     }
 
@@ -387,11 +435,11 @@ int parse_arguments(int argc, char *argv[], args_option_t *options)
         return 0;
     }
 
-    init_options(options);
-    shift_nonopt_args(argc, argv, options);
+    _init_options(options);
+    _shift_nonopt_args(argc, argv, options);
 
 
-    if (parse_options(argc, argv, options) < 0) {
+    if (_parse_options(argc, argv, options) < 0) {
         return -1;
     }
 
