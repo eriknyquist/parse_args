@@ -1,10 +1,28 @@
+/*
+ * Erik Nyquist <eknyquist@gmail.com>
+ * Command line argument parser
+ *
+ * API definition
+ */
+
 #include <stdlib.h>
 #include <string.h>
 
 
-#define ARRAY_LEN(array) (sizeof(array) / sizeof((array)[0]))
-#define MAX_OPTION_LEN (64)
-
+/**
+ * Defines a named option that requires an additional argument
+ *
+ * @param  short_flagstr   String to expect for the short version of the option
+ *                         flag. Should begin with at least one "-" character,
+ *                         e.g. "-f"
+ * @param  long_flagstr    String to expect for the long version of the option
+ *                         flag. Should begin with at least one "-" character,
+ *                         e.g. "--file". This value can be set to NULL if no
+ *                         long version is needed.
+ * @param  argtype         Argument datatype, must be of type argtype_e
+ * @param  argdata         Pointer to an object of type #argtype to copy the
+ *                         decoded argument data
+ */
 #define ARGS_OPTION(short_flagstr, long_flagstr, argtype, argdata) { \
     .short_flag = short_flagstr, \
     .long_flag = long_flagstr, \
@@ -14,6 +32,14 @@
     .seen = 0 \
 }
 
+
+/**
+ * Defines a positional argument
+ *
+ * @param  argtype         Argument datatype, must be of type argtype_e
+ * @param  argdata         Pointer to an object of type #argtype to copy the
+ *                         decoded argument data
+ */
 #define ARGS_POSITIONAL_ARG(argtype, argdata) { \
     .short_flag = NULL, \
     .long_flag = NULL, \
@@ -23,6 +49,23 @@
     .seen = 0 \
 }
 
+
+/**
+ * Defines an named option that does not require an additional argument. This
+ * type of option behaves as a boolean input-- if the flag is present in the
+ * argument list, the value is set to 1. Otherwise, the value is set to 0.
+ *
+ * @param  short_flagstr   String to expect for the short version of the option
+ *                         flag. Should begin with at least one "-" character,
+ *                         e.g. "-f"
+ * @param  long_flagstr    String to expect for the long version of the option
+ *                         flag. Should begin with at least one "-" character,
+ *                         e.g. "--file". This value can be set to NULL if no
+ *                         long version is needed.
+ * @param  value           Pointer to an int, to write the flag status to. A
+ *                         value of 1 means the flag is present, 0 means the
+ *                         flag is not present.
+ */
 #define ARGS_FLAG(short_flagstr, long_flagstr, value) { \
     .short_flag = short_flagstr, \
     .long_flag = long_flagstr, \
@@ -32,6 +75,10 @@
     .seen = 0 \
 }
 
+
+/**
+ * A list of option definitions must end with this sentinel value
+ */
 #define ARGS_END_OF_OPTIONS { \
     .short_flag = NULL, \
     .long_flag = NULL, \
@@ -41,6 +88,65 @@
     .seen = 0 \
 }
 
+
+/**
+ * Available data types for arguments
+ */
+typedef enum {
+    ARGTYPE_INT = 0,
+    ARGTYPE_LONG,
+    ARGTYPE_UINT,
+    ARGTYPE_ULONG,
+    ARGTYPE_FLOAT,
+    ARGTYPE_DOUBLE,
+    ARGTYPE_STRING,
+    ARGTYPE_HEX,
+    ARGTYPE_NONE
+} argtype_e;
+
+/**
+ * Available option types
+ */
+typedef enum {
+    OPTTYPE_FLAG,
+    OPTTYPE_OPTION,
+    OPTTYPE_POSITIONAL,
+    OPTTYPE_NONE
+} opttype_e;
+
+/**
+ * Structure to hold data required for a single option
+ */
+typedef struct {
+    int seen;
+    const char *short_flag;
+    const char *long_flag;
+    argtype_e arg_type;
+    opttype_e opt_type;
+    void *data;
+} args_option_t;
+
+
+/**
+ * Parse all commands line arguments
+ *
+ * @param  argc     Argument count, passed directly from main()
+ * @param  argv     Argument list, passed directly from main()
+ * @param  options  List of option definitions
+ *
+ * @return          0 if argument parsing succeeded, -1 otherwise
+ */
+int parse_arguments(int argc, char *argv[], args_option_t *options);
+
+
+#define ARRAY_LEN(array) (sizeof(array) / sizeof((array)[0]))
+#define MAX_OPTION_LEN (64)
+
+
+/*
+ * This is the end of the API definition. The rest of this file contains the
+ * implementation.
+ */
 
 typedef int (*arg_decoder_t)(char*, void*);
 
@@ -58,18 +164,6 @@ typedef struct {
     const char *name;
 } decode_params_t;
 
-typedef enum {
-    ARGTYPE_INT = 0,
-    ARGTYPE_LONG,
-    ARGTYPE_UINT,
-    ARGTYPE_ULONG,
-    ARGTYPE_FLOAT,
-    ARGTYPE_DOUBLE,
-    ARGTYPE_STRING,
-    ARGTYPE_HEX,
-    ARGTYPE_NONE
-} argtype_e;
-
 static decode_params_t _decoders[] = {
     { .decode=_decode_int, .name="integer" },                 // ARGTYPE_INT
     { .decode=_decode_long, .name="long integer" },           // ARGTYPE_LONG
@@ -81,21 +175,6 @@ static decode_params_t _decoders[] = {
     { .decode=_decode_hex, .name="hexadecimal" }              // ARGTYPE_HEX
 };
 
-typedef enum {
-    OPTTYPE_FLAG,
-    OPTTYPE_OPTION,
-    OPTTYPE_POSITIONAL,
-    OPTTYPE_NONE
-} opttype_e;
-
-typedef struct {
-    int seen;
-    const char *short_flag;
-    const char *long_flag;
-    argtype_e arg_type;
-    opttype_e opt_type;
-    void *data;
-} args_option_t;
 
 static int _decode_int(char *input, void *output)
 {
@@ -111,6 +190,7 @@ static int _decode_int(char *input, void *output)
     return 0;
 }
 
+
 static int _decode_long(char *input, void *output)
 {
     char *endptr = NULL;
@@ -124,6 +204,7 @@ static int _decode_long(char *input, void *output)
     *long_output = longval;
     return 0;
 }
+
 
 static int _decode_uint(char *input, void *output)
 {
@@ -139,6 +220,7 @@ static int _decode_uint(char *input, void *output)
     return 0;
 }
 
+
 static int _decode_ulong(char *input, void *output)
 {
     char *endptr = NULL;
@@ -152,6 +234,7 @@ static int _decode_ulong(char *input, void *output)
     *long_output = longval;
     return 0;
 }
+
 
 static int _decode_float(char *input, void *output)
 {
@@ -167,6 +250,7 @@ static int _decode_float(char *input, void *output)
     return 0;
 }
 
+
 static int _decode_double(char *input, void *output)
 {
     char *endptr = NULL;
@@ -181,12 +265,14 @@ static int _decode_double(char *input, void *output)
     return 0;
 }
 
+
 static int _decode_string(char *input, void *output)
 {
     char **outptr = (char **)output;
     *outptr = input;
     return 0;
 }
+
 
 static int _decode_hex(char *input, void *output)
 {
@@ -201,6 +287,7 @@ static int _decode_hex(char *input, void *output)
     *long_output = val;
     return 0;
 }
+
 
 static args_option_t *_get_option(args_option_t *options, const char *opt)
 {
@@ -250,6 +337,10 @@ static int is_optarg(char *argv[], int index, args_option_t *options)
 }
 
 
+/*
+ * Check if there are any option flags in the argument list, between the given
+ * index and the end of the argument list
+ */
 static int _optargs_ahead(int argc, char *argv[], int index)
 {
     for (int i = index; i < argc; i++)
@@ -262,6 +353,7 @@ static int _optargs_ahead(int argc, char *argv[], int index)
 
     return 0;
 }
+
 
 /*
  * Find any arguments that do not follow an option flag requiring an argument,
@@ -296,6 +388,7 @@ static void _shift_nonopt_args(int argc, char *argv[], args_option_t *options)
     }
 }
 
+
 /*
  * Set all flag data to zero
  */
@@ -312,10 +405,11 @@ static void _init_options(args_option_t *options)
     }
 }
 
+
 /*
  * Decode the argument data for a named option
  */
-int _decode_value(args_option_t *opt, char *flag, char *input)
+static int _decode_value(args_option_t *opt, char *flag, char *input)
 {
     decode_params_t *params = &_decoders[opt->arg_type];
     if (params->decode(input, opt->data) < 0)
@@ -327,10 +421,11 @@ int _decode_value(args_option_t *opt, char *flag, char *input)
     return 0;
 }
 
+
 /*
  * Parse a single positional arg
  */
-int _parse_positional(char *arg, args_option_t *options)
+static int _parse_positional(char *arg, args_option_t *options)
 {
 
     // Find the first unseen positional arg entry
@@ -359,10 +454,11 @@ int _parse_positional(char *arg, args_option_t *options)
     return 0;
 }
 
+
 /*
  * Calculate max. number of positional arguments allowed
  */
-int _calculate_max_positionals(args_option_t *options)
+static int _calculate_max_positionals(args_option_t *options)
 {
     int ret = 0;
     for (int i = 0; options[i].opt_type != OPTTYPE_NONE; i++)
@@ -376,10 +472,11 @@ int _calculate_max_positionals(args_option_t *options)
     return ret;
 }
 
+
 /*
  * Parse all named options and flags
  */
-int _parse_options(int argc, char *argv[], args_option_t *options)
+static int _parse_options(int argc, char *argv[], args_option_t *options)
 {
     int max_positionals = _calculate_max_positionals(options);
     int positionals = 0;
@@ -457,6 +554,7 @@ int _parse_options(int argc, char *argv[], args_option_t *options)
 
     return 0;
 }
+
 
 int parse_arguments(int argc, char *argv[], args_option_t *options)
 {
