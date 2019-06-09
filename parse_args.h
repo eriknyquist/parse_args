@@ -290,6 +290,7 @@ static void _shift_nonopt_args(int argc, char *argv[], args_option_t *options)
             }
 
             moved += 1;
+            i -= 1;
             argv[argc - 1] = temp;
         }
     }
