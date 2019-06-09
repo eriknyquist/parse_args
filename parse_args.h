@@ -309,85 +309,7 @@ static args_option_t *_get_option(args_option_t *options, const char *opt)
 
     return NULL;
 }
-
-
-/*
- * Returns 1 if the string at argv[index] follows a valid option flag that
- * requires an argument, 0 otherwise
- */
-static int is_optarg(char *argv[], int index, args_option_t *options)
-{
-    if (index == 1)
-    {
-        return 0;
-    }
-
-    if (argv[index - 1][0] != '-')
-    {
-        return 0;
-    }
-
-    args_option_t *opt = _get_option(options, argv[index - 1]);
-    if (NULL == opt)
-    {
-        return 0;
-    }
-
-    return opt->opt_type == OPTTYPE_OPTION;
-}
-
-
-/*
- * Check if there are any option flags in the argument list, between the given
- * index and the end of the argument list
- */
-static int _optargs_ahead(int argc, char *argv[], int index)
-{
-    for (int i = index; i < argc; i++)
-    {
-        if (argv[i][0] == '-')
-        {
-            return 1;
-        }
-    }
-
-    return 0;
-}
-
-
-/*
- * Find any arguments that do not follow an option flag requiring an argument,
- * and shift them to the end of the argument list. Returns the index of the
- * first positional arg after shifting is done.
- */
-static void _shift_nonopt_args(int argc, char *argv[], args_option_t *options)
-{
-    int moved = 0;
-
-    for (int i = 1; i < (argc - moved); i++) {
-        if (argv[i][0] != '-') {
-            if (is_optarg(argv, i, options)) {
-                continue;
-            }
-
-            if (!_optargs_ahead(argc, argv, i + 1) && (0 == moved))
-            {
-                return;
-            }
-
-            char *temp = argv[i];
-
-            for (int j = i + 1; j < argc; j++) {
-                argv[j - 1] = argv[j];
-            }
-
-            moved += 1;
-            i -= 1;
-            argv[argc - 1] = temp;
-        }
-    }
-}
-
+//
 
 /*
  * Set all flag data to zero
@@ -564,7 +486,6 @@ int parse_arguments(int argc, char *argv[], args_option_t *options)
     }
 
     _init_options(options);
-    _shift_nonopt_args(argc, argv, options);
 
     if (_parse_options(argc, argv, options) < 0) {
         return -1;
