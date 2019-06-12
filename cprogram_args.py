@@ -15,13 +15,7 @@ int main(int argc, char *argv[])
 }
 """
 
-class UnknownArgType(Exception):
-    pass
-
-class TooManyLongFlags(Exception):
-    pass
-
-class TooManyShortFlags(Exception):
+class ArgParseError(Exception):
     pass
 
 class CArgData(object):
@@ -65,16 +59,16 @@ def generate_c_code(opts, flags, pos):
     return ret + c_main_text
 
 class COption(object):
-    def __init__(self, argtype, opttype, short_arg, long_arg=None):
+    def __init__(self, argtype, opttype, short_flag, long_flag=None):
         if opttype == COptType.FLAG:
             self.argtype = "_flag"
         elif argtype not in arg_type_data:
-            raise UnknownArgType("unknown argument type: %s" % argtype)
+            raise ArgParseError("unknown argument type: %s" % argtype)
         else:
             self.argtype = argtype
 
-        self.short_arg = short_arg
-        self.long_arg = long_arg
+        self.short_flag = short_flag
+        self.long_flag = long_flag
         self.opttype = opttype
         self._varname = None
 
@@ -111,20 +105,20 @@ class COption(object):
 
         ret = ""
         argdata = arg_type_data[self.argtype]
-        longarg = "NULL" if not self.long_arg else '"%s"' % self.long_arg
+        longarg = "NULL" if not self.long_flag else '"%s"' % self.long_flag
 
         if self.opttype == COptType.POSITIONAL:
             ret = ("ARGS_POSITIONAL_ARG(%s, &%s)" % (argdata.argtype_name,
                                                      self._varname))
 
         elif self.opttype == COptType.OPTION:
-            ret = ("ARGS_OPTION(\"%s\", %s, %s, &%s)" % (self.short_arg,
+            ret = ("ARGS_OPTION(\"%s\", %s, %s, &%s)" % (self.short_flag,
                                                          longarg,
                                                          argdata.argtype_name,
                                                          self._varname))
 
         elif self.opttype == COptType.FLAG:
-            ret = ("ARGS_FLAG(\"%s\", %s, &%s)" % (self.short_arg, longarg,
+            ret = ("ARGS_FLAG(\"%s\", %s, &%s)" % (self.short_flag, longarg,
                                                    self._varname))
 
         else:
@@ -132,69 +126,90 @@ class COption(object):
 
         return "    " + ret
 
-def parse_arg(args, index):
-    i = index
+def count_items(items, testfunc):
+    return sum(testfunc(x) for x in items)
+
+def verify_option_definitions(opts, flags):
+    options = opts + flags
+
+    for option in options:
+        if option.long_flag is not None:
+            check = lambda x: ((x.long_flag is not None) and
+                               (x.long_flag == option.long_flag))
+
+            if count_items(options, check) > 1:
+                raise ArgParseError("flag in use for multiple options: %s"
+                                    % option.long_flag)
+
+        if option.short_flag is not None:
+            check = lambda x: ((x.short_flag is not None) and
+                              (x.short_flag == option.short_flag))
+
+            if count_items(options, check) > 1:
+                raise ArgParseError("flag in use for multiple options: %s"
+                                    % option.short_flag)
+
+        if option.opttype in [COptType.FLAG, COptType.OPTION]:
+            if option.short_flag is None:
+                raise ArgParseError("long flag without short flag: %s"
+                                    % option.long_flag)
+
+def parse_arg(arg):
     shortflag = None
     longflag = None
     argtype = None
+    fields = arg.split(',')
 
-    if args[i].startswith('--'):
-        longflag = args[i]
-        i += 1
-        if i == len(args):
-            return i - index, shortflag, longflag, argtype
+    for field in fields:
+        if (field[0] == '-') and (not field.startswith('--')):
+            if shortflag is not None:
+                raise ArgParseError("only one short flag allowed: %s" % arg)
 
-        if args[i].startswith('--'):
-            raise TooManyLongFlags()
+            shortflag = field
 
-        if args[i][0] == '-':
-            short_flag = args[i]
-            i += 1
-    else:
-        shortflag = args[i]
-        i += 1
-        if i == len(args):
-            return i - index, shortflag, longflag, argtype
+        elif field.startswith('--'):
+            if longflag is not None:
+                raise ArgParseError("only one long flag allowed: %s" % arg)
 
-        if args[i][0] == '-':
-            if not args[i].startswith('--'):
-                raise TooManyShortFlags()
+            longflag = field
 
-            longflag = args[i]
-            i += 1
+        else:
+            if argtype is not None:
+                raise ArgParseError("only one data type allowed: %s" % arg)
 
-    if (i < len(args)) and args[i][0] != '-':
-        argtype = args[i]
-        i += 1
+            argtype = field
 
-    return i - index, shortflag, longflag, argtype
+    return shortflag, longflag, argtype
 
 def parse_args(args):
-    i = 1
     opts = []
     flags = []
     pos = []
 
-    while i < len(args):
-        if args[i][0] != '-':
-            pos.append(COption(args[i], COptType.POSITIONAL, None, None))
-            i += 1
-            continue
-
-        inc, shortflag, longflag, argtype = parse_arg(args, i)
-        i += inc
+    for arg in args[1:]:
+        shortflag, longflag, argtype = parse_arg(arg)
 
         opttype = None
-        if argtype:
-            opts.append(COption(argtype, COptType.OPTION, shortflag, longflag))
-        else:
+        if (shortflag is None) and (longflag is None):
+            pos.append(COption(argtype, COptType.POSITIONAL, None, None))
+        elif argtype is None:
             flags.append(COption(None, COptType.FLAG, shortflag, longflag))
+        else:
+            opts.append(COption(argtype, COptType.OPTION, shortflag, longflag))
 
+    verify_option_definitions(opts, flags)
     return opts, flags, pos
 
 def main():
-    opts, flags, pos = parse_args(sys.argv)
+    try:
+        opts, flags, pos = parse_args(sys.argv)
+    except ArgParseError as e:
+        print("\nError: %s\n" % e)
+        return -1
+
     print generate_c_code(opts, flags, pos)
 
+    return 0
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
