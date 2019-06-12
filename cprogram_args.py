@@ -132,48 +132,48 @@ class COption(object):
 
         return "    " + ret
 
+def parse_arg(args, index):
+    i = index
+    shortflag = None
+    longflag = None
+    argtype = None
+
+    if args[i].startswith('--'):
+        longflag = args[i]
+        i += 1
+        if i == len(args):
+            return i - index, shortflag, longflag, argtype
+
+        if args[i].startswith('--'):
+            raise TooManyLongFlags()
+
+        if args[i][0] == '-':
+            short_flag = args[i]
+            i += 1
+    else:
+        shortflag = args[i]
+        i += 1
+        if i == len(args):
+            return i - index, shortflag, longflag, argtype
+
+        if args[i][0] == '-':
+            if not args[i].startswith('--'):
+                raise TooManyShortFlags()
+
+            longflag = args[i]
+            i += 1
+
+    if (i < len(args)) and args[i][0] != '-':
+        argtype = args[i]
+        i += 1
+
+    return i - index, shortflag, longflag, argtype
+
 def parse_args(args):
     i = 1
     opts = []
     flags = []
     pos = []
-
-    def parse_arg(index):
-        i = index
-        shortflag = None
-        longflag = None
-        argtype = None
-
-        if args[i].startswith('--'):
-            longflag = args[i]
-            i += 1
-            if i == len(args):
-                return i - index, shortflag, longflag, argtype
-
-            if args[i].startswith('--'):
-                raise TooManyLongFlags()
-
-            if args[i][0] == '-':
-                short_flag = args[i]
-                i += 1
-        else:
-            shortflag = args[i]
-            i += 1
-            if i == len(args):
-                return i - index, shortflag, longflag, argtype
-
-            if args[i][0] == '-':
-                if not args[i].startswith('--'):
-                    raise TooManyShortFlags()
-
-                longflag = args[i]
-                i += 1
-
-        if (i < len(args)) and args[i][0] != '-':
-            argtype = args[i]
-            i += 1
-
-        return i - index, shortflag, longflag, argtype
 
     while i < len(args):
         if args[i][0] != '-':
@@ -181,7 +181,7 @@ def parse_args(args):
             i += 1
             continue
 
-        inc, shortflag, longflag, argtype = parse_arg(i)
+        inc, shortflag, longflag, argtype = parse_arg(args, i)
         i += inc
 
         opttype = None
