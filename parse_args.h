@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef PARSE_ARGS_H
+#define PARSE_ARGS_H
 
 /**
  * Defines a named option that requires an additional argument
@@ -505,3 +507,5 @@ int parse_arguments(int argc, char *argv[], args_option_t *options)
 
     return 0;
 }
+
+#endif /* PARSE_ARGS_H */
