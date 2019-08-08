@@ -11,6 +11,7 @@
 #ifndef PARSE_ARGS_H
 #define PARSE_ARGS_H
 
+
 /**
  * Defines a named option that requires an additional argument
  *
@@ -106,6 +107,7 @@ typedef enum {
     ARGTYPE_NONE
 } argtype_e;
 
+
 /**
  * Available option types
  */
@@ -115,6 +117,7 @@ typedef enum {
     OPTTYPE_POSITIONAL,
     OPTTYPE_NONE
 } opttype_e;
+
 
 /**
  * Structure to hold data required for a single option
@@ -136,19 +139,46 @@ typedef struct {
  * @param  argv     Argument list, passed directly from main()
  * @param  options  List of option definitions
  *
- * @return          0 if argument parsing succeeded, -1 otherwise
+ * @return          0 if argument parsing succeeded, -1 if an error occurred
  */
 int parse_arguments(int argc, char *argv[], args_option_t *options);
 
 
-#define ARRAY_LEN(array) (sizeof(array) / sizeof((array)[0]))
-#define MAX_OPTION_LEN (64)
+/**
+ * Print an error message (using printf) describing the error that caused
+ * parse_args to fail. If no error has occurred, then nothing will be printed.
+ */
+void parse_arguments_print_error(void);
+
+
+/**
+ * Return a pointer to an string describing the error that caused parse_args to
+ * fail. If no error has occurred, NULL is returned.
+ *
+ * @return   Pointer to a string describing the error, or NULL for no error
+ */
+char *parse_arguments_error_string(void);
 
 
 /*
- * This is the end of the API definition. The rest of this file contains the
- * implementation.
+ * End of the API definition. The rest of this file contains the implementation.
  */
+
+
+#define ARRAY_LEN(array) (sizeof(array) / sizeof((array)[0]))
+
+// Max. length of an option string
+#define MAX_OPTION_LEN (64)
+
+// Max. length of a generated error message
+#define MAX_ERR_LEN (256)
+
+// Store a formatted error string in the error message buffer
+#define ARGS_ERR(...) snprintf(_error_message, MAX_ERR_LEN, __VA_ARGS__)
+
+
+// Buffer for error message
+static char _error_message[MAX_ERR_LEN] = {0};
 
 // Generic function for converting a string argument to something else
 typedef int (*arg_decoder_t)(char*, void*);
@@ -168,6 +198,7 @@ typedef struct {
     arg_decoder_t decode;  // Function to convert string to desired type
     const char *name;      // Human-readable type name
 } decode_params_t;
+
 
 // Decoding table - maps an argtype_e to corresponding decode_params_t object
 static decode_params_t _decoders[] = {
@@ -321,6 +352,7 @@ static args_option_t *_get_option(args_option_t *options, const char *opt)
     return NULL;
 }
 
+
 /*
  * Set all flag data to zero
  */
@@ -346,7 +378,7 @@ static int _decode_value(args_option_t *opt, char *flag, char *input)
     decode_params_t *params = &_decoders[opt->arg_type];
     if (params->decode(input, opt->data) < 0)
     {
-        printf("%s value required for %s\n", params->name, flag);
+        ARGS_ERR("%s value required for %s", params->name, flag);
         return -1;
     }
 
@@ -421,13 +453,13 @@ static int _parse_options(int argc, char *argv[], args_option_t *options)
             args_option_t *opt = _get_option(options, argv[i]);
             if (NULL == opt)
             {
-                printf("unknown option '%s'\n", argv[i]);
+                ARGS_ERR("unknown option '%s'", argv[i]);
                 return -1;
             }
 
             if (opt->seen)
             {
-                printf("option '%s' is set more than once\n", argv[i]);
+                ARGS_ERR("option '%s' is set more than once", argv[i]);
                 return -1;
             }
 
@@ -455,7 +487,7 @@ static int _parse_options(int argc, char *argv[], args_option_t *options)
             // Option requires an argument
             if (i == (argc - 1))
             {
-                printf("option '%s' requires an argument\n", argv[i]);
+                ARGS_ERR("option '%s' requires an argument", argv[i]);
                 return -1;
             }
 
@@ -471,7 +503,7 @@ static int _parse_options(int argc, char *argv[], args_option_t *options)
         {
             if (positionals >= max_positionals)
             {
-                printf("too many positional arguments\n");
+                ARGS_ERR("too many positional arguments");
                 return -1;
             }
 
@@ -485,6 +517,28 @@ static int _parse_options(int argc, char *argv[], args_option_t *options)
     }
 
     return 0;
+}
+
+
+char *parse_arguments_error_string(void)
+{
+    if (0 == _error_message[0])
+    {
+        return NULL;
+    }
+
+    return _error_message;
+}
+
+
+void parse_arguments_print_error(void)
+{
+    if (0 == _error_message[0])
+    {
+        return;
+    }
+
+    printf("%s\n", _error_message);
 }
 
 
@@ -507,7 +561,7 @@ int parse_arguments(int argc, char *argv[], args_option_t *options)
         {
             if (!options[i].seen)
             {
-                printf("missing required positional arguments\n");
+                ARGS_ERR("missing required positional arguments");
                 return -1;
             }
         }

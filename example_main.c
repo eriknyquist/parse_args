@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 {
     if (parse_arguments(argc, argv, options) < 0)
     {
-        printf("Error parsing arguments\n");
+        printf("Error parsing arguments:\n%s\n", parse_arguments_error_string());
         return -1;
     }
 
