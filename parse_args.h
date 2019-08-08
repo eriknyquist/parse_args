@@ -150,8 +150,10 @@ int parse_arguments(int argc, char *argv[], args_option_t *options);
  * implementation.
  */
 
+// Generic function for converting a string argument to something else
 typedef int (*arg_decoder_t)(char*, void*);
 
+// Functions for converting string arguments to specific types
 static int _decode_int(char *input, void *output);
 static int _decode_long(char *input, void *output);
 static int _decode_uint(char *input, void *output);
@@ -161,11 +163,13 @@ static int _decode_double(char *input, void *output);
 static int _decode_string(char *input, void *output);
 static int _decode_hex(char *input, void *output);
 
+// Structure containing data required to convert an argument to some type
 typedef struct {
-    arg_decoder_t decode;
-    const char *name;
+    arg_decoder_t decode;  // Function to convert string to desired type
+    const char *name;      // Human-readable type name
 } decode_params_t;
 
+// Decoding table - maps an argtype_e to corresponding decode_params_t object
 static decode_params_t _decoders[] = {
     { .decode=_decode_int, .name="integer" },                 // ARGTYPE_INT
     { .decode=_decode_long, .name="long integer" },           // ARGTYPE_LONG
@@ -177,6 +181,8 @@ static decode_params_t _decoders[] = {
     { .decode=_decode_hex, .name="hexadecimal" }              // ARGTYPE_HEX
 };
 
+
+/* Decoder functions implementation */
 
 static int _decode_int(char *input, void *output)
 {
@@ -291,6 +297,9 @@ static int _decode_hex(char *input, void *output)
 }
 
 
+/*
+ * Find the corresponding option data for an option string
+ */
 static args_option_t *_get_option(args_option_t *options, const char *opt)
 {
     for (int i = 0; options[i].opt_type != OPTTYPE_NONE; i++)
@@ -311,7 +320,6 @@ static args_option_t *_get_option(args_option_t *options, const char *opt)
 
     return NULL;
 }
-//
 
 /*
  * Set all flag data to zero
