@@ -459,7 +459,8 @@ static int _parse_options(int argc, char *argv[], args_option_t *options)
 
             if (opt->seen)
             {
-                ARGS_ERR("option '%s' is set more than once", argv[i]);
+                ARGS_ERR("option '%s/%s' is set more than once",
+                         opt->short_flag, opt->long_flag);
                 return -1;
             }
 
