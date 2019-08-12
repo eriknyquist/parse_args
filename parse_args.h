@@ -420,9 +420,9 @@ static int _parse_positional(char *arg, args_option_t *options)
 
 
 /*
- * Calculate max. number of positional arguments allowed
+ * Count the number of positional arguments in option list
  */
-static int _calculate_max_positionals(args_option_t *options)
+static int _count_positionals(args_option_t *options)
 {
     int ret = 0;
     for (int i = 0; options[i].opt_type != OPTTYPE_NONE; i++)
@@ -442,8 +442,8 @@ static int _calculate_max_positionals(args_option_t *options)
  */
 static int _parse_options(int argc, char *argv[], args_option_t *options)
 {
-    int max_positionals = _calculate_max_positionals(options);
-    int positionals = 0;
+    int expected_positionals = _count_positionals(options);
+    int seen_positionals = 0;
 
     for (int i = 1; i < argc; i++)
     {
@@ -502,7 +502,7 @@ static int _parse_options(int argc, char *argv[], args_option_t *options)
 
         else
         {
-            if (positionals >= max_positionals)
+            if (seen_positionals >= expected_positionals)
             {
                 ARGS_ERR("too many positional arguments");
                 return -1;
@@ -513,8 +513,14 @@ static int _parse_options(int argc, char *argv[], args_option_t *options)
                 return -1;
             }
 
-            positionals += 1;
+            seen_positionals += 1;
         }
+    }
+
+    if (seen_positionals < expected_positionals)
+    {
+        ARGS_ERR("missing positional arguments");
+        return -1;
     }
 
     return 0;
@@ -554,18 +560,6 @@ int parse_arguments(int argc, char *argv[], args_option_t *options)
 
     if (_parse_options(argc, argv, options) < 0) {
         return -1;
-    }
-
-    for (int i = 0; options[i].opt_type != OPTTYPE_NONE; i++)
-    {
-        if (OPTTYPE_POSITIONAL == options[i].opt_type)
-        {
-            if (!options[i].seen)
-            {
-                ARGS_ERR("missing required positional arguments");
-                return -1;
-            }
-        }
     }
 
     return 0;
