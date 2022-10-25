@@ -28,7 +28,7 @@ args_option_t options[] = {
     ARGS_OPTION("-x", "--hex", ARGTYPE_HEX, &hex_value),
     ARGS_OPTION("-s", "--string", ARGTYPE_STRING, &str_value),
     ARGS_FLAG("-q", NULL, &flag1),
-    ARGS_FLAG("-w", NULL, &flag2),
+    ARGS_FLAG("-w", "--whatever", &flag2),
     ARGS_END_OF_OPTIONS
 };
 
